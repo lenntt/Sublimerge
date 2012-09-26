@@ -57,10 +57,6 @@ class SublimergeView():
     currentDiff = -1
     regions = []
     currentRegion = None
-    stopScrollSync = False
-    lastLeftPos = None
-    lastRightPos = None
-    scrollSyncRunning = False
 
     def __init__(self, window, left, right):
         self.window = window
@@ -275,36 +271,21 @@ class SublimergeView():
                     self.regions[j][regionKey] = sublime.Region(self.regions[j][regionKey].begin() + sizeDiff, self.regions[j][regionKey].end() + sizeDiff)
         view.end_edit(edit)
 
-    def syncScroll(self, enable):
-        if enable:
-            self.stopScrollSync = False
-            self.periodicScrollSync()
-        else:
-            self.stopScrollSync = True
+    def selectRegionUnderCaret(self, view, regionKey):
+        sel = view.sel()
+        selB = sel[0].b
+        selBegin = sel[0].begin()
+        selEnd = sel[len(sel) - 1].end()
 
-    def periodicScrollSync(self):
-        return
-        # if not self.scrollSyncRunning:
-        #     self.scrollSyncRunning = True
-        #     leftPos = self.left.viewport_position()
-        #     rightPos = self.right.viewport_position()
+        if selBegin != selEnd:
+            sel.clear()
+            sel.add(sublime.Region(selB, selB))
 
-        #     if leftPos != self.lastLeftPos:
-        #         self.lastLeftPos = leftPos
-        #         self.lastRightPos = leftPos
-
-        #         self.right.set_viewport_position(leftPos, True)
-        #     elif rightPos != self.lastRightPos:
-        #         self.lastRightPos = rightPos
-        #         self.lastLeftPos = rightPos
-
-        #         self.left.set_viewport_position(rightPos, True)
-
-        # self.scrollSyncRunning = False
-
-        # if not self.stopScrollSync and self.left.window() != None:
-        #     sublime.set_timeout(self.periodicScrollSync, 0)
-
+        for i in range(len(self.regions)):
+            region = self.regions[i][regionKey]
+            if region.begin() <= sel[0].begin() and region.end() >= sel[0].end():
+                self.selectDiff(i)
+                break
 
 class SublimergeCommand(sublime_plugin.WindowCommand):
     viewsList = []
@@ -374,6 +355,13 @@ class SublimergeListener(sublime_plugin.EventListener):
     left = None
     right = None
 
+    def on_selection_modified(self, view):
+        if diffView != None:
+            if view.id() == diffView.left.id():
+                diffView.selectRegionUnderCaret(diffView.left, 'regionLeft')
+            elif view.id() == diffView.right.id():
+                diffView.selectRegionUnderCaret(diffView.right, 'regionRight')
+
     def on_load(self, view):
         global diffView
 
@@ -389,7 +377,6 @@ class SublimergeListener(sublime_plugin.EventListener):
 
             if self.left != None and self.right != None:
                 diffView.loadDiff()
-                diffView.syncScroll(True)
                 self.left = None
                 self.right = None
 
@@ -407,5 +394,4 @@ class SublimergeListener(sublime_plugin.EventListener):
         global diffView
         if diffView != None:
             if view.id() == diffView.left.id() or view.id() == diffView.right.id():
-                diffView.syncScroll(False)
                 diffView = None
