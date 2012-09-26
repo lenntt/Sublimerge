@@ -5,7 +5,7 @@ Sublimerge is a Sublime Text 2 plugin which allows to diff and merge files DIREC
 
 Default key bindings (platform independent):
 
-[ctrl]+[alt]+[d] - open menu to diff the current file to
+[ctrl]+[alt]+[d] - open files menu to select the file you wish diff the current file to
 
 [ctrl]+[alt]+[,] - merge the change from right to left
 
