@@ -5,7 +5,6 @@
 
 import sublime
 import sublime_plugin
-import re
 import difflib
 
 diffView = None
@@ -57,6 +56,7 @@ class SublimergeView():
     currentDiff = -1
     regions = []
     currentRegion = None
+    justInitialized = False
 
     def __init__(self, window, left, right):
         window.run_command('new_window')
@@ -86,8 +86,28 @@ class SublimergeView():
         self.right.set_read_only(True)
         self.window.set_view_index(self.right, 1, 0)
 
-    def insertDiffContents(self, diff):
+    def enlargeCorrespondingPart(self, part1, part2):
+        linesPlus = part1.splitlines()
+        linesMinus = part2.splitlines()
 
+        diffLines = len(linesPlus) - len(linesMinus)
+
+        if diffLines < 0:  # linesPlus < linesMinus
+            for i in range(-diffLines):
+                linesPlus.append('?')
+
+        elif diffLines > 0:  # linesPlus > linesMinus
+            for i in range(diffLines):
+                linesMinus.append('?')
+
+        result = []
+
+        result.append("\n".join(linesPlus) + "\n")
+        result.append("\n".join(linesMinus) + "\n")
+
+        return result
+
+    def insertDiffContents(self, diff):
         left = self.left
         right = self.right
 
@@ -112,56 +132,36 @@ class SublimergeView():
                 right.insert(edit, right.size(), part)
                 right.end_edit(edit)
             else:
-                pair = {'regionLeft': None, 'regionRight': None, 'name': 'diff' + str(i), 'mergeLeft': '', 'mergeRight': '', 'merged': False}
+                pair = {
+                    'regionLeft': None,
+                    'regionRight': None,
+                    'name': 'diff' + str(i),
+                    'mergeLeft': part['+'][:],
+                    'mergeRight': part['-'][:]
+                }
+
                 i += 1
 
-                if len(part['+']) > 0:
-                    edit = left.begin_edit()
-                    start = left.size()
+                #if len(part['+']) > 0:
+                edit = left.begin_edit()
+                start = left.size()
 
-                    if len(part['-']) == 0:
-                        left.insert(edit, start, re.sub("[^\s]", " ", part['+']))
-                        length = len(part['+'])
-                    else:
-                        left.insert(edit, start, part['-'])
-                        length = len(part['-'])
+                enlarged = self.enlargeCorrespondingPart(part['+'], part['-'])
 
-                    left.end_edit(edit)
+                left.insert(edit, start, enlarged[1])
+                length = len(enlarged[1])
+                left.end_edit(edit)
 
-                    pair['regionLeft'] = sublime.Region(start, start + length)
+                pair['regionLeft'] = sublime.Region(start, start + length)
 
-                    edit = right.begin_edit()
-                    start = right.size()
-                    right.insert(edit, start, part['+'])
-                    right.end_edit(edit)
+                edit = right.begin_edit()
+                start = right.size()
+                right.insert(edit, start, enlarged[0])
+                right.end_edit(edit)
 
-                    pair['regionRight'] = sublime.Region(start, start + len(part['+']))
-
-                elif len(part['-']) > 0:
-                    edit = right.begin_edit()
-                    start = right.size()
-
-                    if len(part['+']) == 0:
-                        right.insert(edit, start, re.sub("[^\s]", " ", part['-']))
-                        length = len(part['-'])
-                    else:
-                        right.insert(edit, start, part['+'])
-                        length = len(part['+]'])
-
-                    right.end_edit(edit)
-
-                    pair['regionRight'] = sublime.Region(start, start + length)
-
-                    edit = left.begin_edit()
-                    start = left.size()
-                    left.insert(edit, start, part['-'])
-                    left.end_edit(edit)
-
-                    pair['regionLeft'] = sublime.Region(start, start + len(part['-']))
+                pair['regionRight'] = sublime.Region(start, start + len(enlarged[0]))
 
                 if pair['regionLeft'] != None and pair['regionRight'] != None:
-                    pair['mergeLeft'] = part['+']
-                    pair['mergeRight'] = part['-']
                     regions.append(pair)
 
         for pair in regions:
@@ -181,17 +181,21 @@ class SublimergeView():
     def selectDiff(self, diffIndex):
         if diffIndex >= 0 and diffIndex < len(self.regions):
             if self.currentRegion != None:
-                if self.currentRegion['merged']:
-                    self.createHiddenRegion(self.currentRegion)
-                else:
-                    self.createDiffRegion(self.currentRegion)
+                if self.currentRegion['regionLeft'].begin() == self.regions[diffIndex]['regionLeft'].begin():
+                    return
+
+                self.createDiffRegion(self.currentRegion)
 
             self.currentRegion = self.regions[diffIndex]
             self.createSelectedRegion(self.currentRegion)
 
             self.currentDiff = diffIndex
-            self.left.show(self.currentRegion['regionLeft'])
-            self.right.show(self.currentRegion['regionRight'])
+
+            if self.justInitialized:
+                self.left.show_at_center(sublime.Region(self.currentRegion['regionLeft'].begin(), self.currentRegion['regionLeft'].begin()))
+                self.right.show_at_center(sublime.Region(self.currentRegion['regionRight'].begin(), self.currentRegion['regionRight'].begin()))
+
+            self.justInitialized = True
 
     def goUp(self):
         self.selectDiff(self.currentDiff - 1)
@@ -243,6 +247,7 @@ class SublimergeView():
                 if i >= self.currentDiff:
                     self.regions[i]['regionLeft'] = sublime.Region(self.regions[i]['regionLeft'].begin() + diffLenLeft, self.regions[i]['regionLeft'].end() + diffLenLeft)
                     self.regions[i]['regionRight'] = sublime.Region(self.regions[i]['regionRight'].begin() + diffLenRight, self.regions[i]['regionRight'].end() + diffLenRight)
+                    self.createDiffRegion(self.regions[i])
 
             target.set_read_only(True)
             source.set_read_only(True)
@@ -259,7 +264,9 @@ class SublimergeView():
             regionKey = 'regionRight'
             contentKey = 'mergeLeft'
 
+        view.set_read_only(False)
         edit = view.begin_edit()
+
         for i in range(len(self.regions)):
             sizeBefore = view.size()
             view.replace(edit, self.regions[i][regionKey], self.regions[i][contentKey])
@@ -268,7 +275,9 @@ class SublimergeView():
             if sizeDiff != 0:
                 for j in range(i, len(self.regions)):
                     self.regions[j][regionKey] = sublime.Region(self.regions[j][regionKey].begin() + sizeDiff, self.regions[j][regionKey].end() + sizeDiff)
+
         view.end_edit(edit)
+        view.set_read_only(True)
 
     def selectRegionUnderCaret(self, view, regionKey):
         sel = view.sel()
@@ -356,6 +365,8 @@ class SublimergeListener(sublime_plugin.EventListener):
     right = None
 
     def on_selection_modified(self, view):
+        global diffView
+
         if diffView != None:
             if view.id() == diffView.left.id():
                 diffView.selectRegionUnderCaret(diffView.left, 'regionLeft')
@@ -372,7 +383,6 @@ class SublimergeListener(sublime_plugin.EventListener):
 
             elif view.id() == diffView.right.id():
                 print "Right file: " + view.file_name()
-
                 self.right = view
 
             if self.left != None and self.right != None:
@@ -392,6 +402,16 @@ class SublimergeListener(sublime_plugin.EventListener):
 
     def on_close(self, view):
         global diffView
+
         if diffView != None:
-            if view.id() == diffView.left.id() or view.id() == diffView.right.id():
+            if view.id() == diffView.left.id():
+                wnd = diffView.right.window()
+                if wnd != None:
+                    wnd.run_command('close_window')
+                diffView = None
+
+            elif view.id() == diffView.right.id():
+                wnd = diffView.left.window()
+                if wnd != None:
+                    wnd.run_command('close_window')
                 diffView = None
