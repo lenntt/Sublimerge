@@ -59,19 +59,17 @@ class SublimergeView():
     currentRegion = None
 
     def __init__(self, window, left, right):
-        self.window = window
-        self.window.run_command('new_window')
-        wnd = sublime.active_window()
+        window.run_command('new_window')
+        self.window = sublime.active_window()
 
-        wnd.set_layout({
+        self.window.set_layout({
             "cols": [0.0, 0.5, 1.0],
             "rows": [0.0, 1.0],
             "cells": [[0, 0, 1, 1], [1, 0, 2, 1]]
         })
 
-        self.left = wnd.open_file(left.file_name())
-        self.right = wnd.open_file(right.file_name())
-        wnd.set_view_index(self.right, 1, 0)
+        self.left = self.window.open_file(left.file_name())
+        self.right = self.window.open_file(right.file_name())
 
         self.left.set_syntax_file(left.settings().get('syntax'))
         self.right.set_syntax_file(right.settings().get('syntax'))
@@ -86,6 +84,7 @@ class SublimergeView():
 
         self.left.set_read_only(True)
         self.right.set_read_only(True)
+        self.window.set_view_index(self.right, 1, 0)
 
     def insertDiffContents(self, diff):
 
@@ -169,7 +168,7 @@ class SublimergeView():
             self.createDiffRegion(pair)
 
         self.regions = regions
-        self.selectDiff(0)
+        sublime.set_timeout(lambda: self.selectDiff(0), 0)  # for some reason this fixes the problem to scroll both views to proper position after loading diff
 
     def createDiffRegion(self, region):
         self.left.add_regions(region['name'], [region['regionLeft']], 'selection', 'dot', sublime.DRAW_OUTLINED)
@@ -286,6 +285,7 @@ class SublimergeView():
             if region.begin() <= sel[0].begin() and region.end() >= sel[0].end():
                 self.selectDiff(i)
                 break
+
 
 class SublimergeCommand(sublime_plugin.WindowCommand):
     viewsList = []
