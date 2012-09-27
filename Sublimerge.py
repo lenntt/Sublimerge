@@ -168,7 +168,7 @@ class SublimergeView():
             self.createDiffRegion(pair)
 
         self.regions = regions
-        sublime.set_timeout(lambda: self.selectDiff(0), 0)  # for some reason this fixes the problem to scroll both views to proper position after loading diff
+        sublime.set_timeout(lambda: self.selectDiff(0), 100)  # for some reason this fixes the problem to scroll both views to proper position after loading diff
 
     def createDiffRegion(self, region):
         self.left.add_regions(region['name'], [region['regionLeft']], 'selection', 'dot', sublime.DRAW_OUTLINED)
