@@ -180,10 +180,12 @@ class SublimergeView():
 
     def selectDiff(self, diffIndex):
         if diffIndex >= 0 and diffIndex < len(self.regions):
-            if self.currentRegion != None:
-                if self.currentRegion['regionLeft'].begin() == self.regions[diffIndex]['regionLeft'].begin():
-                    return
+            self.left.sel().clear()
+            self.left.sel().add(sublime.Region(0, 0))
+            self.right.sel().clear()
+            self.right.sel().add(sublime.Region(0, 0))
 
+            if self.currentRegion != None:
                 self.createDiffRegion(self.currentRegion)
 
             self.currentRegion = self.regions[diffIndex]
@@ -221,6 +223,8 @@ class SublimergeView():
                 targetRegion = self.currentRegion['regionRight']
                 contents = self.currentRegion['mergeRight']
 
+            target.set_scratch(True)
+
             target.set_read_only(False)
             source.set_read_only(False)
 
@@ -240,19 +244,27 @@ class SublimergeView():
 
             target.set_scratch(False)
 
-            self.currentRegion = None
             del self.regions[self.currentDiff]
 
-            for i in range(len(self.regions)):
-                if i >= self.currentDiff:
-                    self.regions[i]['regionLeft'] = sublime.Region(self.regions[i]['regionLeft'].begin() + diffLenLeft, self.regions[i]['regionLeft'].end() + diffLenLeft)
-                    self.regions[i]['regionRight'] = sublime.Region(self.regions[i]['regionRight'].begin() + diffLenRight, self.regions[i]['regionRight'].end() + diffLenRight)
+            for i in range(self.currentDiff, len(self.regions)):
+                movedRegion = sublime.Region(self.regions[i]['regionLeft'].begin() + diffLenLeft, self.regions[i]['regionLeft'].end() + diffLenLeft)
+                self.regions[i]['regionLeft'] = movedRegion
+
+                movedRegion = sublime.Region(self.regions[i]['regionRight'].begin() + diffLenRight, self.regions[i]['regionRight'].end() + diffLenRight)
+                self.regions[i]['regionRight'] = movedRegion
+
+                if i != self.currentDiff:
                     self.createDiffRegion(self.regions[i])
 
             target.set_read_only(True)
             source.set_read_only(True)
 
-            self.selectDiff(self.currentDiff)
+            if self.currentDiff > len(self.regions) - 1:
+                self.currentDiff = len(self.regions) - 1
+
+            if self.currentDiff >= 0:
+                self.currentRegion = self.regions[self.currentDiff]
+                self.createSelectedRegion(self.currentRegion)
 
     def abandonUnmergedDiffs(self, side):
         if side == 'left':
@@ -281,6 +293,9 @@ class SublimergeView():
 
     def selectRegionUnderCaret(self, view, regionKey):
         sel = view.sel()
+        if len(sel) == 0:
+            return
+
         selB = sel[0].b
         selBegin = sel[0].begin()
         selEnd = sel[len(sel) - 1].end()
