@@ -311,25 +311,6 @@ class SublimergeView():
         view.end_edit(edit)
         view.set_read_only(True)
 
-    def selectRegionUnderCaret(self, view, regionKey):
-        sel = view.sel()
-        if len(sel) == 0:
-            return
-
-        selB = sel[0].b
-        selBegin = sel[0].begin()
-        selEnd = sel[len(sel) - 1].end()
-
-        if selBegin != selEnd:
-            sel.clear()
-            sel.add(sublime.Region(selB, selB))
-
-        for i in range(len(self.regions)):
-            region = self.regions[i][regionKey]
-            if region.begin() <= sel[0].begin() and region.end() >= sel[0].end():
-                self.selectDiff(i)
-                break
-
 
 class SublimergeCommand(sublime_plugin.WindowCommand):
     viewsList = []
@@ -398,15 +379,6 @@ class SublimergeMergeRightCommand(sublime_plugin.WindowCommand):
 class SublimergeListener(sublime_plugin.EventListener):
     left = None
     right = None
-
-    def on_selection_modified(self, view):
-        global diffView
-
-        if diffView != None:
-            if view.id() == diffView.left.id():
-                diffView.selectRegionUnderCaret(diffView.left, 'regionLeft')
-            elif view.id() == diffView.right.id():
-                diffView.selectRegionUnderCaret(diffView.right, 'regionRight')
 
     def on_load(self, view):
         global diffView
