@@ -76,7 +76,6 @@ class SublimergeView():
     currentDiff = -1
     regions = []
     currentRegion = None
-    justInitialized = False
 
     def __init__(self, window, left, right):
         window.run_command('new_window')
@@ -162,7 +161,6 @@ class SublimergeView():
 
                 i += 1
 
-                #if len(part['+']) > 0:
                 edit = left.begin_edit()
                 start = left.size()
 
@@ -213,11 +211,8 @@ class SublimergeView():
 
             self.currentDiff = diffIndex
 
-            if self.justInitialized:
-                self.left.show_at_center(sublime.Region(self.currentRegion['regionLeft'].begin(), self.currentRegion['regionLeft'].begin()))
-                self.right.show_at_center(sublime.Region(self.currentRegion['regionRight'].begin(), self.currentRegion['regionRight'].begin()))
-
-            self.justInitialized = True
+            self.left.show_at_center(sublime.Region(self.currentRegion['regionLeft'].begin(), self.currentRegion['regionLeft'].begin()))
+            self.right.show_at_center(sublime.Region(self.currentRegion['regionRight'].begin(), self.currentRegion['regionRight'].begin()))
 
     def goUp(self):
         self.selectDiff(self.currentDiff - 1)
@@ -282,9 +277,12 @@ class SublimergeView():
             if self.currentDiff > len(self.regions) - 1:
                 self.currentDiff = len(self.regions) - 1
 
+            self.currentRegion = None
+
             if self.currentDiff >= 0:
-                self.currentRegion = self.regions[self.currentDiff]
-                self.createSelectedRegion(self.currentRegion)
+                self.selectDiff(self.currentDiff)
+            else:
+                self.currentDiff = -1
 
     def abandonUnmergedDiffs(self, side):
         if side == 'left':
