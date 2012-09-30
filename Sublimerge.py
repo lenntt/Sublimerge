@@ -193,8 +193,8 @@ class SublimergeView():
         self.right.add_regions(region['name'], [region['regionRight']], 'selection', 'dot', sublime.DRAW_OUTLINED)
 
     def createSelectedRegion(self, region):
-        self.left.add_regions(region['name'], [region['regionLeft']], 'selection', 'dot')
-        self.right.add_regions(region['name'], [region['regionRight']], 'selection', 'dot')
+        self.left.add_regions(region['name'], [region['regionLeft']], 'selection', 'bookmark')
+        self.right.add_regions(region['name'], [region['regionRight']], 'selection', 'bookmark')
 
     def selectDiff(self, diffIndex):
         if diffIndex >= 0 and diffIndex < len(self.regions):
