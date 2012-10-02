@@ -76,6 +76,9 @@ class SublimergeView():
     currentDiff = -1
     regions = []
     currentRegion = None
+    scrollSyncRunning = False
+    lastLeftPos = None
+    lastRightPos = None
 
     def __init__(self, window, left, right):
         window.run_command('new_window')
@@ -104,6 +107,7 @@ class SublimergeView():
         self.left.set_read_only(True)
         self.right.set_read_only(True)
         self.window.set_view_index(self.right, 1, 0)
+        self.periodicScrollSync()
 
     def enlargeCorrespondingPart(self, part1, part2):
         linesPlus = part1.splitlines()
@@ -308,6 +312,27 @@ class SublimergeView():
 
         view.end_edit(edit)
         view.set_read_only(True)
+
+    def periodicScrollSync(self):
+        if not self.scrollSyncRunning:
+            self.scrollSyncRunning = True
+            leftPos = self.left.viewport_position()
+            rightPos = self.right.viewport_position()
+
+            if leftPos != self.lastLeftPos:
+                self.lastLeftPos = leftPos
+                self.lastRightPos = leftPos
+                self.right.set_viewport_position(leftPos, True)
+
+            elif rightPos != self.lastRightPos:
+                self.lastRightPos = rightPos
+                self.lastLeftPos = rightPos
+                self.left.set_viewport_position(rightPos, True)
+
+        self.scrollSyncRunning = False
+
+        if self.left.window() != None and self.right.window() != None:
+            sublime.set_timeout(self.periodicScrollSync, 0)
 
 
 class SublimergeCommand(sublime_plugin.WindowCommand):
