@@ -107,7 +107,7 @@ class SublimergeView():
         self.left.set_read_only(True)
         self.right.set_read_only(True)
         self.window.set_view_index(self.right, 1, 0)
-        self.periodicScrollSync()
+        # self.periodicScrollSync()
 
     def enlargeCorrespondingPart(self, part1, part2):
         linesPlus = part1.splitlines()
