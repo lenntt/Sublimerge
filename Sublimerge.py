@@ -69,6 +69,63 @@ class SublimergeDiffer():
         return data
 
 
+class SublimergeScrollSync():
+    left = None
+    right = None
+    scrollingView = None
+    viewToSync = None
+    lastPosLeft = None
+    lastPosRight = None
+    isRunning = False
+    last = None
+    targetPos = None
+
+    def __init__(self, left, right):
+        self.left = left
+        self.right = right
+        self.sync()
+
+    def sync(self):
+        beginLeft = self.left.viewport_position()
+        beginRight = self.right.viewport_position()
+
+        if not self.isRunning:
+            if beginLeft[0] != beginRight[0] or beginLeft[1] != beginRight[1]:
+                if self.lastPosLeft == None or (self.lastPosLeft[0] != beginLeft[0] or self.lastPosLeft[1] != beginLeft[1]):
+                    self.isRunning = True
+                    self.scrollingView = self.left
+                    self.viewToSync = self.right
+
+                elif self.lastPosRight == None or (self.lastPosRight[0] != beginRight[0] or self.lastPosRight[1] != beginRight[1]):
+                    self.isRunning = True
+                    self.scrollingView = self.right
+                    self.viewToSync = self.left
+
+        else:
+            pos = self.scrollingView.viewport_position()
+
+            if self.targetPos == None and self.last != None and pos[0] == self.last[0] and pos[1] == self.last[1]:
+                self.targetPos = (min(pos[0], self.viewToSync.layout_extent()[0] - self.viewToSync.viewport_extent()[0]), pos[1])
+                self.viewToSync.set_viewport_position(self.targetPos)
+
+            elif self.targetPos != None:
+                poss = self.viewToSync.viewport_position()
+
+                if poss[0] == self.targetPos[0] and poss[1] == self.targetPos[1]:
+                    self.isRunning = False
+                    self.targetPos = None
+                    self.scrollingView = None
+                    self.viewToSync = None
+
+            self.last = pos
+
+        self.lastPosRight = beginRight
+        self.lastPosLeft = beginLeft
+
+        if self.left.window() != None and self.right.window() != None:
+            sublime.set_timeout(self.sync, 100)
+
+
 class SublimergeView():
     left = None
     right = None
@@ -107,7 +164,7 @@ class SublimergeView():
         self.left.set_read_only(True)
         self.right.set_read_only(True)
         self.window.set_view_index(self.right, 1, 0)
-        # self.periodicScrollSync()
+        SublimergeScrollSync(self.left, self.right)
 
     def enlargeCorrespondingPart(self, part1, part2):
         linesPlus = part1.splitlines()
@@ -312,27 +369,6 @@ class SublimergeView():
 
         view.end_edit(edit)
         view.set_read_only(True)
-
-    def periodicScrollSync(self):
-        if not self.scrollSyncRunning:
-            self.scrollSyncRunning = True
-            leftPos = self.left.viewport_position()
-            rightPos = self.right.viewport_position()
-
-            if leftPos != self.lastLeftPos:
-                self.lastLeftPos = leftPos
-                self.lastRightPos = leftPos
-                self.right.set_viewport_position(leftPos, True)
-
-            elif rightPos != self.lastRightPos:
-                self.lastRightPos = rightPos
-                self.lastLeftPos = rightPos
-                self.left.set_viewport_position(rightPos, True)
-
-        self.scrollSyncRunning = False
-
-        if self.left.window() != None and self.right.window() != None:
-            sublime.set_timeout(self.periodicScrollSync, 0)
 
 
 class SublimergeCommand(sublime_plugin.WindowCommand):
