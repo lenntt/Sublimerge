@@ -136,10 +136,12 @@ class SublimergeView():
     scrollSyncRunning = False
     lastLeftPos = None
     lastRightPos = None
+    diff = None
 
-    def __init__(self, window, left, right):
+    def __init__(self, window, left, right, diff):
         window.run_command('new_window')
         self.window = sublime.active_window()
+        self.diff = diff
 
         self.window.set_layout({
             "cols": [0.0, 0.5, 1.0],
@@ -154,17 +156,6 @@ class SublimergeView():
         self.right.set_syntax_file(right.settings().get('syntax'))
         self.left.set_scratch(True)
         self.right.set_scratch(True)
-
-    def loadDiff(self):
-        text1 = self.left.substr(sublime.Region(0, self.left.size()))
-        text2 = self.right.substr(sublime.Region(0, self.right.size()))
-
-        self.insertDiffContents(SublimergeDiffer().difference(text1, text2))
-
-        self.left.set_read_only(True)
-        self.right.set_read_only(True)
-        self.window.set_view_index(self.right, 1, 0)
-        SublimergeScrollSync(self.left, self.right)
 
     def enlargeCorrespondingPart(self, part1, part2):
         linesPlus = part1.splitlines()
@@ -186,6 +177,9 @@ class SublimergeView():
         result.append("\n".join(linesMinus) + "\n")
 
         return result
+
+    def loadDiff(self):
+        self.insertDiffContents(self.diff)
 
     def insertDiffContents(self, diff):
         left = self.left
@@ -248,6 +242,11 @@ class SublimergeView():
 
         self.regions = regions
         sublime.set_timeout(lambda: self.selectDiff(0), 100)  # for some reason this fixes the problem to scroll both views to proper position after loading diff
+
+        self.left.set_read_only(True)
+        self.right.set_read_only(True)
+        self.window.set_view_index(self.right, 1, 0)
+        SublimergeScrollSync(self.left, self.right)
 
     def createDiffRegion(self, region):
         self.left.add_regions(region['name'], [region['regionLeft']], 'selection', 'dot', sublime.DRAW_OUTLINED)
@@ -371,6 +370,20 @@ class SublimergeView():
         view.set_read_only(True)
 
 
+class SublimergeDiffThread():
+    def __init__(self, window, left, right):
+        self.window = window
+        self.left = left
+        self.right = right
+        sublime.set_timeout(self.run, 0)
+
+    def run(self):
+        global diffView
+        diff = SublimergeDiffer().difference(self.left.substr(sublime.Region(0, self.left.size())), self.right.substr(sublime.Region(0, self.right.size())))
+        diffView = SublimergeView(self.window, self.left, self.right, diff)
+        self.left.erase_status('sublimerge-computing-diff')
+
+
 class SublimergeCommand(sublime_plugin.WindowCommand):
     viewsList = []
     diffIndex = 0
@@ -408,7 +421,9 @@ class SublimergeCommand(sublime_plugin.WindowCommand):
                 global diffView
 
                 if self.saved(compareTo):
-                    diffView = SublimergeView(self.window, self.window.active_view(), compareTo)
+                    active = self.window.active_view()
+                    active.set_status('sublimerge-computing-diff', 'Computing differences...')
+                    SublimergeDiffThread(self.window, active, compareTo)
 
 
 class SublimergeGoUpCommand(sublime_plugin.WindowCommand):
