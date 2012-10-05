@@ -379,7 +379,14 @@ class SublimergeDiffThread():
 
     def run(self):
         global diffView
-        diff = SublimergeDiffer().difference(self.left.substr(sublime.Region(0, self.left.size())), self.right.substr(sublime.Region(0, self.right.size())))
+        text1 = self.left.substr(sublime.Region(0, self.left.size()))
+        text2 = self.right.substr(sublime.Region(0, self.right.size()))
+
+        if text1 == text2:
+            sublime.message_dialog('There is no difference between files')
+            return
+
+        diff = SublimergeDiffer().difference(text1, text2)
         diffView = SublimergeView(self.window, self.left, self.right, diff)
         self.left.erase_status('sublimerge-computing-diff')
 
