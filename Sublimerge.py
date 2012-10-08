@@ -399,13 +399,14 @@ class SublimergeCommand(sublime_plugin.WindowCommand):
         self.viewsList = []
         self.diffIndex = 0
         active = self.window.active_view()
-        allViews = self.window.views()
-
-        for view in allViews:
-            if view.file_name() != active.file_name():
-                self.viewsList.append(view.file_name())
 
         if self.saved(active):
+            allViews = self.window.views()
+
+            for view in allViews:
+                if view.file_name() != None and view.file_name() != active.file_name():
+                    self.viewsList.append(view.file_name())
+
             self.window.show_quick_panel(self.viewsList, self.onListSelect)
 
     def saved(self, view):
