@@ -105,7 +105,7 @@ class SublimergeScrollSync():
             pos = self.scrollingView.viewport_position()
 
             if self.targetPos == None and self.last != None and pos[0] == self.last[0] and pos[1] == self.last[1]:
-                self.targetPos = (min(pos[0], self.viewToSync.layout_extent()[0] - self.viewToSync.viewport_extent()[0]), pos[1])
+                self.targetPos = (max(0, min(pos[0], self.viewToSync.layout_extent()[0] - self.viewToSync.viewport_extent()[0])), pos[1])
                 self.viewToSync.set_viewport_position(self.targetPos)
 
             elif self.targetPos != None:
