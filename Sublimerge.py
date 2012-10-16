@@ -66,6 +66,8 @@ class SublimergeDiffer():
 
                 last = part
 
+        print data
+
         return data
 
 
@@ -217,22 +219,20 @@ class SublimergeView():
                 i += 1
 
                 edit = left.begin_edit()
-                start = left.size()
+                leftStart = left.size()
 
                 enlarged = self.enlargeCorrespondingPart(part['+'], part['-'])
 
-                left.insert(edit, start, enlarged[1])
-                length = len(enlarged[1])
+                left.insert(edit, leftStart, enlarged[1])
                 left.end_edit(edit)
 
-                pair['regionLeft'] = sublime.Region(start, start + length)
-
                 edit = right.begin_edit()
-                start = right.size()
-                right.insert(edit, start, enlarged[0])
+                rightStart = right.size()
+                right.insert(edit, rightStart, enlarged[0])
                 right.end_edit(edit)
 
-                pair['regionRight'] = sublime.Region(start, start + len(enlarged[0]))
+                pair['regionLeft'] = sublime.Region(leftStart, leftStart + len(left.substr(sublime.Region(leftStart, left.size()))))
+                pair['regionRight'] = sublime.Region(rightStart, rightStart + len(right.substr(sublime.Region(rightStart, right.size()))))
 
                 if pair['regionLeft'] != None and pair['regionRight'] != None:
                     regions.append(pair)
