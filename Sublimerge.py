@@ -66,8 +66,6 @@ class SublimergeDiffer():
 
                 last = part
 
-        print data
-
         return data
 
 
