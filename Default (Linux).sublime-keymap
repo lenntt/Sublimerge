@@ -1,7 +1,9 @@
 [
-	{ "keys": ["ctrl+alt+d"], "command": "sublimerge" },
+    { "keys": ["ctrl+alt+d"], "command": "sublimerge" },
     { "keys": ["ctrl+alt+="], "command": "sublimerge_go_down"},
     { "keys": ["ctrl+alt+-"], "command": "sublimerge_go_up"},
+    { "keys": ["ctrl+alt+pagedown"], "command": "sublimerge_go_down"},
+    { "keys": ["ctrl+alt+pageup"], "command": "sublimerge_go_up"},
     { "keys": ["ctrl+alt+,"], "command": "sublimerge_merge_left"},
     { "keys": ["ctrl+alt+."], "command": "sublimerge_merge_right"}
 ]

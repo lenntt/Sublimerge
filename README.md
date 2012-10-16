@@ -11,9 +11,9 @@ Default key bindings (platform independent):
 
 [ctrl]+[alt]+[.] - merge the change from left to right
 
-[ctrl]+[alt]+[=] - go to the next difference
+[ctrl]+[alt]+[=] or [ctrl]+[alt]+[pagedown] - go to the next difference
 
-[ctrl]+[alt]+[-] - go to the previous difference
+[ctrl]+[alt]+[-] or [ctrl]+[alt]+[pageup] - go to the previous difference
 
 
 Because this is my first Sublime Text 2 plugin and the first Python code I have ever written, probably some things could be done
