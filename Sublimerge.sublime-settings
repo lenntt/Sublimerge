@@ -1,0 +1,14 @@
+//You should not modify this file because it will be automatically
+//overwritten after Sublimerge update. To change the settings, edit
+//the "Settings - User" file (can be found via Preferences menu)
+{
+     //set to true if you want to hide sidebar in comparison window
+    "hide_side_bar": true,
+
+    //difference regions configuration
+    "diff_region_expander_text": "?",
+    "diff_region_scope": "selection",
+    "diff_region_gutter_icon": "dot",
+    "selected_diff_region_scope": "selection",
+    "selected_diff_region_gutter_icon": "bookmark"
+}

@@ -29,6 +29,30 @@ import difflib
 
 diffView = None
 
+settings = sublime.load_settings('Sublimerge.sublime-settings')
+
+
+class SublimergeSettings():
+    s = {
+        'hide_side_bar': True,
+        'diff_region_expander_text': '?',
+        'diff_region_scope': 'selection',
+        'diff_region_gutter_icon': 'dot',
+        'selected_diff_region_scope': 'selection',
+        'selected_diff_region_gutter_icon': 'bookmark'
+    }
+
+    def load(self):
+        for name in self.s:
+            self.s[name] = settings.get(name, self.s[name])
+
+    def get(self, name):
+        return self.s[name]
+
+S = SublimergeSettings()
+S.load()
+settings.add_on_change('reload', lambda: S.load())
+
 
 class SublimergeDiffer():
     def difference(self, text1, text2):
@@ -143,6 +167,9 @@ class SublimergeView():
         self.window = sublime.active_window()
         self.diff = diff
 
+        if (S.get('hide_side_bar')):
+            self.window.run_command('toggle_side_bar')
+
         self.window.set_layout({
             "cols": [0.0, 0.5, 1.0],
             "rows": [0.0, 1.0],
@@ -165,11 +192,11 @@ class SublimergeView():
 
         if diffLines < 0:  # linesPlus < linesMinus
             for i in range(-diffLines):
-                linesPlus.append('?')
+                linesPlus.append(S.get('diff_region_expander_text'))
 
         elif diffLines > 0:  # linesPlus > linesMinus
             for i in range(diffLines):
-                linesMinus.append('?')
+                linesMinus.append(S.get('diff_region_expander_text'))
 
         result = []
 
@@ -247,12 +274,12 @@ class SublimergeView():
         SublimergeScrollSync(self.left, self.right)
 
     def createDiffRegion(self, region):
-        self.left.add_regions(region['name'], [region['regionLeft']], 'selection', 'dot', sublime.DRAW_OUTLINED)
-        self.right.add_regions(region['name'], [region['regionRight']], 'selection', 'dot', sublime.DRAW_OUTLINED)
+        self.left.add_regions(region['name'], [region['regionLeft']], S.get('diff_region_scope'), S.get('diff_region_gutter_icon'), sublime.DRAW_OUTLINED)
+        self.right.add_regions(region['name'], [region['regionRight']], S.get('diff_region_scope'), S.get('diff_region_gutter_icon'), sublime.DRAW_OUTLINED)
 
     def createSelectedRegion(self, region):
-        self.left.add_regions(region['name'], [region['regionLeft']], 'selection', 'bookmark')
-        self.right.add_regions(region['name'], [region['regionRight']], 'selection', 'bookmark')
+        self.left.add_regions(region['name'], [region['regionLeft']], S.get('selected_diff_region_scope'), S.get('selected_diff_region_gutter_icon'))
+        self.right.add_regions(region['name'], [region['regionRight']], S.get('selected_diff_region_scope'), S.get('selected_diff_region_gutter_icon'))
 
     def selectDiff(self, diffIndex):
         if diffIndex >= 0 and diffIndex < len(self.regions):
