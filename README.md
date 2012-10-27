@@ -15,10 +15,14 @@ Default key bindings (platform independent):
 
 [ctrl]+[alt]+[-] or [ctrl]+[alt]+[pageup] - go to the previous difference
 
+![Sublimerge](http://cloud.github.com/downloads/borysf/Sublimerge/Screenshot.png "Sublimerge")
 
 Because this is my first Sublime Text 2 plugin and the first Python code I have ever written, probably some things could be done
 better. So any feedback is welcome!
 
 --
 https://github.com/borysf/Sublimerge
+
 borys.forytarz@gmail.com
+
+http://borysforytarz.pl
