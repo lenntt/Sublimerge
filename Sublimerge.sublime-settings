@@ -5,6 +5,9 @@
      //set to true if you want to hide sidebar in comparison window
     "hide_side_bar": true,
 
+    //set to true if you want to ignore whitespace differences
+    "ignore_whitespace": false,
+
     //difference regions configuration
     "diff_region_expander_text": "?",
     "diff_region_scope": "selection",

@@ -26,6 +26,7 @@
 import sublime
 import sublime_plugin
 import difflib
+import re
 
 diffView = None
 
@@ -39,7 +40,8 @@ class SublimergeSettings():
         'diff_region_scope': 'selection',
         'diff_region_gutter_icon': 'dot',
         'selected_diff_region_scope': 'selection',
-        'selected_diff_region_gutter_icon': 'bookmark'
+        'selected_diff_region_gutter_icon': 'bookmark',
+        'ignore_whitespace': False
     }
 
     def load(self):
@@ -55,21 +57,29 @@ settings.add_on_change('reload', lambda: S.load())
 
 
 class SublimergeDiffer():
+    def isJunk(self, s):
+        return re.sub('(^\s+)|(\s+$)', '', s) == ''
+
     def difference(self, text1, text2):
         last = None
         data = []
+        if S.get('ignore_whitespace'):
+            lines = difflib.ndiff(text1.splitlines(1), text2.splitlines(1), self.isJunk, self.isJunk)
+        else:
+            lines = difflib.Differ().compare(text1.splitlines(1), text2.splitlines(1))
 
-        for line in list(difflib.Differ().compare(text1.splitlines(1), text2.splitlines(1))):
+        for line in list(lines):
+            print line
             change = line[0]
             line = line[2:len(line)]
 
             part = None
 
             if change == '+':
-                part = {'+': line, '-': ''}
+                part = {'+': line, '-': '', 'ignore': False}
 
             elif change == '-':
-                part = {'-': line, '+': ''}
+                part = {'-': line, '+': '', 'ignore': False}
 
             elif change == ' ':
                 part = line
@@ -80,15 +90,25 @@ class SublimergeDiffer():
             if part != None:
                 if isinstance(part, str) and isinstance(last, str):
                     data[len(data) - 1] += part
-                elif isinstance(part, dict) and isinstance(last, dict):
+                elif isinstance(part, dict) and isinstance(last, dict) and not last['ignore']:
+                    lastIdx = len(data) - 1
+
                     if part['+'] != '':
-                        data[len(data) - 1]['+'] += part['+']
+                        data[lastIdx]['+'] += part['+']
                     if part['-'] != '':
-                        data[len(data) - 1]['-'] += part['-']
+                        data[lastIdx]['-'] += part['-']
+
+                    if S.get('ignore_whitespace'):
+                        trimRe = '(^\s+)|(\s+$)'
+                        if re.sub(trimRe, '', data[lastIdx]['+']) == re.sub(trimRe, '', data[lastIdx]['-']):
+                            part['ignore'] = data[lastIdx]['ignore'] = True
+
                 else:
                     data.append(part)
 
                 last = part
+
+        print data
 
         return data
 
@@ -129,7 +149,10 @@ class SublimergeScrollSync():
             pos = self.scrollingView.viewport_position()
 
             if self.targetPos == None and self.last != None and pos[0] == self.last[0] and pos[1] == self.last[1]:
-                self.targetPos = (max(0, min(pos[0], self.viewToSync.layout_extent()[0] - self.viewToSync.viewport_extent()[0])), pos[1])
+                ve = self.viewToSync.viewport_extent()
+                le = self.viewToSync.layout_extent()
+
+                self.targetPos = (max(0, min(pos[0], le[0] - ve[0])), max(0, min(pos[1], le[1] - ve[1])))
                 self.viewToSync.set_viewport_position(self.targetPos)
 
             elif self.targetPos != None:
@@ -233,34 +256,43 @@ class SublimergeView():
                 right.insert(edit, right.size(), part)
                 right.end_edit(edit)
             else:
-                pair = {
-                    'regionLeft': None,
-                    'regionRight': None,
-                    'name': 'diff' + str(i),
-                    'mergeLeft': part['+'][:],
-                    'mergeRight': part['-'][:]
-                }
+                if part['ignore']:
+                    edit = left.begin_edit()
+                    left.insert(edit, left.size(), part['-'])
+                    left.end_edit(edit)
 
-                i += 1
+                    edit = right.begin_edit()
+                    right.insert(edit, right.size(), part['+'])
+                    right.end_edit(edit)
+                else:
+                    pair = {
+                        'regionLeft': None,
+                        'regionRight': None,
+                        'name': 'diff' + str(i),
+                        'mergeLeft': part['+'][:],
+                        'mergeRight': part['-'][:]
+                    }
 
-                edit = left.begin_edit()
-                leftStart = left.size()
+                    i += 1
 
-                enlarged = self.enlargeCorrespondingPart(part['+'], part['-'])
+                    edit = left.begin_edit()
+                    leftStart = left.size()
 
-                left.insert(edit, leftStart, enlarged[1])
-                left.end_edit(edit)
+                    enlarged = self.enlargeCorrespondingPart(part['+'], part['-'])
 
-                edit = right.begin_edit()
-                rightStart = right.size()
-                right.insert(edit, rightStart, enlarged[0])
-                right.end_edit(edit)
+                    left.insert(edit, leftStart, enlarged[1])
+                    left.end_edit(edit)
 
-                pair['regionLeft'] = sublime.Region(leftStart, leftStart + len(left.substr(sublime.Region(leftStart, left.size()))))
-                pair['regionRight'] = sublime.Region(rightStart, rightStart + len(right.substr(sublime.Region(rightStart, right.size()))))
+                    edit = right.begin_edit()
+                    rightStart = right.size()
+                    right.insert(edit, rightStart, enlarged[0])
+                    right.end_edit(edit)
 
-                if pair['regionLeft'] != None and pair['regionRight'] != None:
-                    regions.append(pair)
+                    pair['regionLeft'] = sublime.Region(leftStart, leftStart + len(left.substr(sublime.Region(leftStart, left.size()))))
+                    pair['regionRight'] = sublime.Region(rightStart, rightStart + len(right.substr(sublime.Region(rightStart, right.size()))))
+
+                    if pair['regionLeft'] != None and pair['regionRight'] != None:
+                        regions.append(pair)
 
         for pair in regions:
             self.createDiffRegion(pair)
@@ -297,7 +329,8 @@ class SublimergeView():
             self.currentDiff = diffIndex
 
             self.left.show_at_center(sublime.Region(self.currentRegion['regionLeft'].begin(), self.currentRegion['regionLeft'].begin()))
-            self.right.show_at_center(sublime.Region(self.currentRegion['regionRight'].begin(), self.currentRegion['regionRight'].begin()))
+            if not S.get('ignore_whitespace'):  # @todo: temporary fix for loosing view sync while ignore_whitespace is true
+                self.right.show_at_center(sublime.Region(self.currentRegion['regionRight'].begin(), self.currentRegion['regionRight'].begin()))
 
     def goUp(self):
         self.selectDiff(self.currentDiff - 1)
