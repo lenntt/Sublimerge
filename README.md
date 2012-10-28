@@ -9,7 +9,11 @@ Default key bindings (platform independent):
 
 [ctrl]+[alt]+[,] - merge the change from right to left
 
+[ctrl]+[alt]+[/] + [ctrl]+[alt]+[,] - merge all changes from right to left
+
 [ctrl]+[alt]+[.] - merge the change from left to right
+
+[ctrl]+[alt]+[/] + [ctrl]+[alt]+[.] - merge all changes from left to right
 
 [ctrl]+[alt]+[=] or [ctrl]+[alt]+[pagedown] - go to the next difference
 

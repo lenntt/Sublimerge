@@ -335,7 +335,12 @@ class SublimergeView():
     def goDown(self):
         self.selectDiff(self.currentDiff + 1)
 
-    def merge(self, direction):
+    def merge(self, direction, mergeAll):
+        if mergeAll:
+            while len(self.regions) > 0:
+                self.merge(direction, False)
+            return
+
         if (self.currentRegion != None):
             lenLeft = self.left.size()
             lenRight = self.right.size()
@@ -513,15 +518,15 @@ class SublimergeGoDownCommand(sublime_plugin.WindowCommand):
 
 
 class SublimergeMergeLeftCommand(sublime_plugin.WindowCommand):
-    def run(self):
+    def run(self, mergeAll=False):
         if diffView != None:
-            diffView.merge('<<')
+            diffView.merge('<<', mergeAll)
 
 
 class SublimergeMergeRightCommand(sublime_plugin.WindowCommand):
-    def run(self):
+    def run(self, mergeAll=False):
         if diffView != None:
-            diffView.merge('>>')
+            diffView.merge('>>', mergeAll)
 
 
 class SublimergeListener(sublime_plugin.EventListener):
