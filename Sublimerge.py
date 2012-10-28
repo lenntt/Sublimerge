@@ -404,6 +404,8 @@ class SublimergeView():
             else:
                 self.currentDiff = -1
 
+            self.window.focus_view(target)
+
     def abandonUnmergedDiffs(self, side):
         if side == 'left':
             view = self.left
