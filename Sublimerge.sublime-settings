@@ -6,7 +6,7 @@
     "hide_side_bar": true,
 
     //set to true if you want to ignore whitespace differences
-    "ignore_whitespace": true,
+    "ignore_whitespace": false,
 
     //difference regions configuration
     "diff_region_expander_text": "?",
