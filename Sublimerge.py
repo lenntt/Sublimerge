@@ -69,7 +69,6 @@ class SublimergeDiffer():
             lines = difflib.Differ().compare(text1.splitlines(1), text2.splitlines(1))
 
         for line in list(lines):
-            print line
             change = line[0]
             line = line[2:len(line)]
 
@@ -107,8 +106,6 @@ class SublimergeDiffer():
                     data.append(part)
 
                 last = part
-
-        print data
 
         return data
 
@@ -440,11 +437,22 @@ class SublimergeDiffThread():
         text1 = self.left.substr(sublime.Region(0, self.left.size()))
         text2 = self.right.substr(sublime.Region(0, self.right.size()))
 
-        if text1 == text2:
+        diff = SublimergeDiffer().difference(text1, text2)
+
+        differs = False
+
+        if S.get('ignore_whitespace'):
+            for item in diff:
+                if isinstance(item, dict) and not item['ignore']:
+                    differs = True
+                    break
+        elif text1 != text2:
+            differs = True
+
+        if not differs:
             sublime.message_dialog('There is no difference between files')
             return
 
-        diff = SublimergeDiffer().difference(text1, text2)
         diffView = SublimergeView(self.window, self.left, self.right, diff)
         self.left.erase_status('sublimerge-computing-diff')
 
