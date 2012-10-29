@@ -19,17 +19,16 @@ Default key bindings (platform independent):
 ![Sublimerge](http://cloud.github.com/downloads/borysf/Sublimerge/Screenshot.png "Sublimerge")
 
 Installation
-============
+------------
 
 If you are using Will Bond's Package Control, you can easily install Sublimerge with `Package Control: Install Package`.
 Otherwise you can simply clone this repo in Sublime Text 2' Packages directory.
 
+--
+
 Because this is my first Sublime Text 2 plugin and the first Python code I have ever written, probably some things could be done
 better. So any feedback is welcome!
 
---
-https://github.com/borysf/Sublimerge
-
-borys.forytarz@gmail.com
-
+https://github.com/borysf/Sublimerge  
+borys.forytarz@gmail.com  
 http://borysforytarz.pl
