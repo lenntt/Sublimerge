@@ -38,6 +38,8 @@ class SublimergeSettings():
         'hide_side_bar': True,
         'diff_region_expander_text': '?',
         'diff_region_scope': 'selection',
+        'diff_region_added_scope': 'support.function',
+        'diff_region_removed_scope': 'keyword',
         'diff_region_gutter_icon': 'dot',
         'selected_diff_region_scope': 'selection',
         'selected_diff_region_gutter_icon': 'bookmark',
@@ -303,8 +305,17 @@ class SublimergeView():
         SublimergeScrollSync(self.left, self.right)
 
     def createDiffRegion(self, region):
-        self.left.add_regions(region['name'], [region['regionLeft']], S.get('diff_region_scope'), S.get('diff_region_gutter_icon'), sublime.DRAW_OUTLINED)
-        self.right.add_regions(region['name'], [region['regionRight']], S.get('diff_region_scope'), S.get('diff_region_gutter_icon'), sublime.DRAW_OUTLINED)
+        rightScope = leftScope = S.get('diff_region_scope')
+
+        if region['mergeLeft'] == '':
+            rightScope = S.get('diff_region_removed_scope')
+            leftScope = S.get('diff_region_added_scope')
+        elif region['mergeRight'] == '':
+            leftScope = S.get('diff_region_removed_scope')
+            rightScope = S.get('diff_region_added_scope')
+
+        self.left.add_regions(region['name'], [region['regionLeft']], leftScope, S.get('diff_region_gutter_icon'), sublime.DRAW_OUTLINED)
+        self.right.add_regions(region['name'], [region['regionRight']], rightScope, S.get('diff_region_gutter_icon'), sublime.DRAW_OUTLINED)
 
     def createSelectedRegion(self, region):
         self.left.add_regions(region['name'], [region['regionLeft']], S.get('selected_diff_region_scope'), S.get('selected_diff_region_gutter_icon'))
