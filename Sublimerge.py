@@ -85,7 +85,7 @@ class SublimergeDiffer():
             elif change == '?':
                 continue
 
-            if isinstance(part, str) and isinstance(last, str):
+            if isinstance(part, str) and isinstance(data[lastIdx], str):
                 data[lastIdx] += part
             else:
                 if isinstance(part, dict):
