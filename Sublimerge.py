@@ -92,23 +92,38 @@ class SublimergeDiffer():
                     if i < len(lines) - 1 and lines[i + 1][0] == '?':
                         part['intraline'] = change
 
-                    if lastIdx >= 0 and isinstance(data[lastIdx], dict):
-                        test = (data[lastIdx]['intraline'] == '-' and change == '+') or (data[lastIdx]['intraline'] == '+' and change == '-')
-                        test2 = (data[lastIdx]['intraline'] == '+' and part['intraline'] == '-') or (data[lastIdx]['intraline'] == '-' and part['intraline'] == '+')
-                        if test or test2 or (data[lastIdx]['intraline'] == '' and part['intraline'] == ''):
-                            data[lastIdx]['-'] += part['-']
+                    if lastIdx >= 0:
+                        last = data[lastIdx]
+                    else:
+                        last = None
+
+                    if isinstance(last, dict):
+                        skip = False
+
+                        im_p = last['intraline'] == '-' and part['change'] == '+'
+                        im_ip = last['intraline'] == '-' and part['intraline'] == '+'
+                        m_ip = last['change'] == '-' and part['intraline'] == '+'
+
+                        if im_p or im_ip or m_ip:
                             data[lastIdx]['+'] += part['+']
-                            if test:
-                                data[lastIdx]['intraline'] = '?'
-                        else:
-                            if (part['+'] != '' and data[lastIdx]['+'] == '') and (part['-'] == '' and data[lastIdx]['-'] != ''):
-                                data[lastIdx]['+'] += part['+']
-                                data[lastIdx]['intraline'] = '?'
-                            elif (part['-'] != '' and data[lastIdx]['-'] == '') and (part['+'] == '' and data[lastIdx]['+'] != ''):
-                                data[lastIdx]['-'] += part['-']
-                                data[lastIdx]['intraline'] = '?'
-                            else:
+                            data[lastIdx]['-'] += part['-']
+                            data[lastIdx]['intraline'] = '!'
+                            skip = True
+                        elif part['intraline'] == '' and last['intraline'] == '':
+                            nextIntraline = None
+                            if i < len(lines) - 2 and lines[i + 2][0] == '?':
+                                nextIntraline = lines[i + 1][0]
+
+                            if nextIntraline == '+' and part['change'] == '-':
                                 data.append(part)
+                                skip = True
+                            else:
+                                data[lastIdx]['+'] += part['+']
+                                data[lastIdx]['-'] += part['-']
+                                skip = True
+
+                        if not skip:
+                            data.append(part)
                     else:
                         data.append(part)
                 else:
@@ -288,7 +303,7 @@ class SublimergeView():
                 edit = left.begin_edit()
                 leftStart = left.size()
 
-                if part['+'] != '' and part['-'] != '':
+                if part['+'] != '' and part['-'] != '' and part['intraline'] != '':
                     inlines = list(difflib.Differ().compare(part['-'].splitlines(1), part['+'].splitlines(1)))
                     begins = {'+': 0, '-': 0}
                     lastLen = 0
