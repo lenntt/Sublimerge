@@ -35,12 +35,14 @@ settings = sublime.load_settings('Sublimerge.sublime-settings')
 
 class SublimergeSettings():
     s = {
+        'same_syntax_only': True,
         'hide_side_bar': True,
         'diff_region_expander_text': '?',
         'diff_region_scope': 'selection',
-        'diff_region_added_scope': 'support.function',
-        'diff_region_removed_scope': 'keyword',
-        'diff_region_gutter_icon': 'dot',
+        'diff_region_added_scope': 'markup.inserted',
+        'diff_region_removed_scope': 'markup.deleted',
+        'diff_region_gutter_icon': 'none',
+        'diff_region_change_scope': 'markup.changed',
         'selected_diff_region_scope': 'selection',
         'selected_diff_region_gutter_icon': 'bookmark',
         'ignore_whitespace': False
@@ -59,28 +61,23 @@ settings.add_on_change('reload', lambda: S.load())
 
 
 class SublimergeDiffer():
-    def isJunk(self, s):
-        return re.sub('(^\s+)|(\s+$)', '', s) == ''
-
     def difference(self, text1, text2):
-        last = None
         data = []
-        if S.get('ignore_whitespace'):
-            lines = difflib.ndiff(text1.splitlines(1), text2.splitlines(1), self.isJunk, self.isJunk)
-        else:
-            lines = difflib.Differ().compare(text1.splitlines(1), text2.splitlines(1))
+        lines = list(difflib.Differ().compare(text1.splitlines(1), text2.splitlines(1)))
 
-        for line in list(lines):
+        for i in range(len(lines)):
+            line = lines[i]
+            lastIdx = len(data) - 1
             change = line[0]
             line = line[2:len(line)]
 
             part = None
 
             if change == '+':
-                part = {'+': line, '-': '', 'ignore': False}
+                part = {'+': line, '-': '', 'change': '+', 'intraline': '', 'intralines': {'+': [], '-': []}}
 
             elif change == '-':
-                part = {'-': line, '+': '', 'ignore': False}
+                part = {'-': line, '+': '', 'change': '-', 'intraline': '', 'intralines': {'+': [], '-': []}}
 
             elif change == ' ':
                 part = line
@@ -88,26 +85,34 @@ class SublimergeDiffer():
             elif change == '?':
                 continue
 
-            if part != None:
-                if isinstance(part, str) and isinstance(last, str):
-                    data[len(data) - 1] += part
-                elif isinstance(part, dict) and isinstance(last, dict) and not last['ignore']:
-                    lastIdx = len(data) - 1
+            if isinstance(part, str) and isinstance(last, str):
+                data[lastIdx] += part
+            else:
+                if isinstance(part, dict):
+                    if i < len(lines) - 1 and lines[i + 1][0] == '?':
+                        part['intraline'] = change
 
-                    if part['+'] != '':
-                        data[lastIdx]['+'] += part['+']
-                    if part['-'] != '':
-                        data[lastIdx]['-'] += part['-']
-
-                    if S.get('ignore_whitespace'):
-                        trimRe = '(^\s+)|(\s+$)'
-                        if re.sub(trimRe, '', data[lastIdx]['+']) == re.sub(trimRe, '', data[lastIdx]['-']):
-                            part['ignore'] = data[lastIdx]['ignore'] = True
-
+                    if lastIdx >= 0 and isinstance(data[lastIdx], dict):
+                        test = (data[lastIdx]['intraline'] == '-' and change == '+') or (data[lastIdx]['intraline'] == '+' and change == '-')
+                        test2 = (data[lastIdx]['intraline'] == '+' and part['intraline'] == '-') or (data[lastIdx]['intraline'] == '-' and part['intraline'] == '+')
+                        if test or test2 or (data[lastIdx]['intraline'] == '' and part['intraline'] == ''):
+                            data[lastIdx]['-'] += part['-']
+                            data[lastIdx]['+'] += part['+']
+                            if test:
+                                data[lastIdx]['intraline'] = '?'
+                        else:
+                            if (part['+'] != '' and data[lastIdx]['+'] == '') and (part['-'] == '' and data[lastIdx]['-'] != ''):
+                                data[lastIdx]['+'] += part['+']
+                                data[lastIdx]['intraline'] = '?'
+                            elif (part['-'] != '' and data[lastIdx]['-'] == '') and (part['+'] == '' and data[lastIdx]['+'] != ''):
+                                data[lastIdx]['-'] += part['-']
+                                data[lastIdx]['intraline'] = '?'
+                            else:
+                                data.append(part)
+                    else:
+                        data.append(part)
                 else:
                     data.append(part)
-
-                last = part
 
         return data
 
@@ -183,6 +188,7 @@ class SublimergeView():
     lastLeftPos = None
     lastRightPos = None
     diff = None
+    createdPositions = False
 
     def __init__(self, window, left, right, diff):
         window.run_command('new_window')
@@ -228,7 +234,8 @@ class SublimergeView():
         return result
 
     def loadDiff(self):
-        self.insertDiffContents(self.diff)
+        self.window.set_view_index(self.right, 1, 0)
+        sublime.set_timeout(lambda: self.insertDiffContents(self.diff), 5)
 
     def insertDiffContents(self, diff):
         left = self.left
@@ -255,53 +262,90 @@ class SublimergeView():
                 right.insert(edit, right.size(), part)
                 right.end_edit(edit)
             else:
-                if part['ignore']:
-                    edit = left.begin_edit()
-                    left.insert(edit, left.size(), part['-'])
-                    left.end_edit(edit)
+                if S.get('ignore_whitespace'):
+                    trimRe = '(^\s+)|(\s+$)'
+                    if re.sub(trimRe, '', part['+']) == re.sub(trimRe, '', part['-']):
+                        edit = left.begin_edit()
+                        left.insert(edit, left.size(), part['-'])
+                        left.end_edit(edit)
 
-                    edit = right.begin_edit()
-                    right.insert(edit, right.size(), part['+'])
-                    right.end_edit(edit)
-                else:
-                    pair = {
-                        'regionLeft': None,
-                        'regionRight': None,
-                        'name': 'diff' + str(i),
-                        'mergeLeft': part['+'][:],
-                        'mergeRight': part['-'][:]
-                    }
+                        edit = right.begin_edit()
+                        right.insert(edit, right.size(), part['+'])
+                        right.end_edit(edit)
+                        continue
 
-                    i += 1
+                pair = {
+                    'regionLeft': None,
+                    'regionRight': None,
+                    'name': 'diff' + str(i),
+                    'mergeLeft': part['+'][:],
+                    'mergeRight': part['-'][:],
+                    'intralines': {'left': [], 'right': []}
+                }
 
-                    edit = left.begin_edit()
-                    leftStart = left.size()
+                i += 1
 
-                    enlarged = self.enlargeCorrespondingPart(part['+'], part['-'])
+                edit = left.begin_edit()
+                leftStart = left.size()
 
-                    left.insert(edit, leftStart, enlarged[1])
-                    left.end_edit(edit)
+                if part['+'] != '' and part['-'] != '':
+                    inlines = list(difflib.Differ().compare(part['-'].splitlines(1), part['+'].splitlines(1)))
+                    begins = {'+': 0, '-': 0}
+                    lastLen = 0
+                    lastChange = None
 
-                    edit = right.begin_edit()
-                    rightStart = right.size()
-                    right.insert(edit, rightStart, enlarged[0])
-                    right.end_edit(edit)
+                    for inline in inlines:
+                        change = inline[0:1]
+                        inline = inline[2:len(inline)]
+                        inlineLen = len(inline)
 
-                    pair['regionLeft'] = sublime.Region(leftStart, leftStart + len(left.substr(sublime.Region(leftStart, left.size()))))
-                    pair['regionRight'] = sublime.Region(rightStart, rightStart + len(right.substr(sublime.Region(rightStart, right.size()))))
+                        if change != '?':
+                            begins[change] += inlineLen
+                            lastLen = inlineLen
+                            lastChange = change
+                        else:
+                            for m in re.finditer('([+-^]+)', inline):
+                                sign = m.group(0)[0:1]
 
-                    if pair['regionLeft'] != None and pair['regionRight'] != None:
-                        regions.append(pair)
+                                if sign == '^':
+                                    sign = lastChange
+
+                                part['intralines'][sign].append([begins[sign] - lastLen + m.start(), begins[sign] - lastLen + m.end()])
+
+                enlarged = self.enlargeCorrespondingPart(part['+'], part['-'])
+
+                left.insert(edit, leftStart, enlarged[1])
+                left.end_edit(edit)
+
+                edit = right.begin_edit()
+                rightStart = right.size()
+                right.insert(edit, rightStart, enlarged[0])
+                right.end_edit(edit)
+
+                pair['regionLeft'] = sublime.Region(leftStart, leftStart + len(left.substr(sublime.Region(leftStart, left.size()))))
+                pair['regionRight'] = sublime.Region(rightStart, rightStart + len(right.substr(sublime.Region(rightStart, right.size()))))
+
+                if pair['regionLeft'] != None and pair['regionRight'] != None:
+                    for position in part['intralines']['-']:
+                        change = sublime.Region(leftStart + position[0], leftStart + position[1])
+                        pair['intralines']['left'].append(change)
+
+                    for position in part['intralines']['+']:
+                        change = sublime.Region(rightStart + position[0], rightStart + position[1])
+                        pair['intralines']['right'].append(change)
+
+                    regions.append(pair)
 
         for pair in regions:
             self.createDiffRegion(pair)
+
+        self.createdPositions = True
 
         self.regions = regions
         sublime.set_timeout(lambda: self.selectDiff(0), 100)  # for some reason this fixes the problem to scroll both views to proper position after loading diff
 
         self.left.set_read_only(True)
         self.right.set_read_only(True)
-        self.window.set_view_index(self.right, 1, 0)
         SublimergeScrollSync(self.left, self.right)
 
     def createDiffRegion(self, region):
@@ -313,6 +357,10 @@ class SublimergeView():
         elif region['mergeRight'] == '':
             leftScope = S.get('diff_region_removed_scope')
             rightScope = S.get('diff_region_added_scope')
+
+        if not self.createdPositions:
+            self.left.add_regions('intralines' + region['name'], region['intralines']['left'], S.get('diff_region_change_scope'))
+            self.right.add_regions('intralines' + region['name'], region['intralines']['right'], S.get('diff_region_change_scope'))
 
         self.left.add_regions(region['name'], [region['regionLeft']], leftScope, S.get('diff_region_gutter_icon'), sublime.DRAW_OUTLINED)
         self.right.add_regions(region['name'], [region['regionRight']], rightScope, S.get('diff_region_gutter_icon'), sublime.DRAW_OUTLINED)
@@ -387,17 +435,22 @@ class SublimergeView():
 
             source.erase_regions(self.currentRegion['name'])
             target.erase_regions(self.currentRegion['name'])
+            source.erase_regions('intralines' + self.currentRegion['name'])
+            target.erase_regions('intralines' + self.currentRegion['name'])
 
             target.set_scratch(False)
 
             del self.regions[self.currentDiff]
 
             for i in range(self.currentDiff, len(self.regions)):
-                movedRegion = sublime.Region(self.regions[i]['regionLeft'].begin() + diffLenLeft, self.regions[i]['regionLeft'].end() + diffLenLeft)
-                self.regions[i]['regionLeft'] = movedRegion
+                self.regions[i]['regionLeft'] = self.moveRegionBy(self.regions[i]['regionLeft'], diffLenLeft)
+                self.regions[i]['regionRight'] = self.moveRegionBy(self.regions[i]['regionRight'], diffLenRight)
 
-                movedRegion = sublime.Region(self.regions[i]['regionRight'].begin() + diffLenRight, self.regions[i]['regionRight'].end() + diffLenRight)
-                self.regions[i]['regionRight'] = movedRegion
+                # for j in range(self.currentDiff, len(self.regions[i]['intralines']['left'])):
+                #     self.regions[i]['intralines']['left'][j] = self.moveRegionBy(self.regions[i]['intralines']['left'][j], diffLenLeft)
+
+                # for j in range(self.currentDiff, len(self.regions[i]['intralines']['right'])):
+                #     self.regions[i]['intralines']['right'][j] = self.moveRegionBy(self.regions[i]['intralines']['right'][j], diffLenRight)
 
                 if i != self.currentDiff:
                     self.createDiffRegion(self.regions[i])
@@ -416,6 +469,9 @@ class SublimergeView():
                 self.currentDiff = -1
 
             self.window.focus_view(target)
+
+    def moveRegionBy(self, region, by):
+        return sublime.Region(region.begin() + by, region.end() + by)
 
     def abandonUnmergedDiffs(self, side):
         if side == 'left':
@@ -460,10 +516,9 @@ class SublimergeDiffThread():
         differs = False
 
         if S.get('ignore_whitespace'):
-            for item in diff:
-                if isinstance(item, dict) and not item['ignore']:
-                    differs = True
-                    break
+            regexp = re.compile('(^\s+)|(\s+$)', re.MULTILINE)
+            if re.sub(regexp, '', text1) != re.sub(regexp, '', text2):
+                differs = True
         elif text1 != text2:
             differs = True
 
@@ -488,7 +543,7 @@ class SublimergeCommand(sublime_plugin.WindowCommand):
             allViews = self.window.views()
 
             for view in allViews:
-                if view.file_name() != None and view.file_name() != active.file_name():
+                if view.file_name() != None and view.file_name() != active.file_name() and (not S.get('same_syntax_only') or view.settings().get('syntax') == active.settings().get('syntax')):
                     self.viewsList.append(view.file_name())
 
             self.window.show_quick_panel(self.viewsList, self.onListSelect)
@@ -572,6 +627,14 @@ class SublimergeListener(sublime_plugin.EventListener):
 
             elif view.id() == diffView.right.id():
                 diffView.abandonUnmergedDiffs('right')
+
+    def on_post_save(self, view):
+        global diffView
+
+        if diffView and (view.id() == diffView.left.id() or view.id() == diffView.right.id()):
+            wnd = view.window()
+            if wnd:
+                wnd.run_command('close_window')
 
     def on_close(self, view):
         global diffView
