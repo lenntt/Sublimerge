@@ -27,6 +27,7 @@ import sublime
 import sublime_plugin
 import difflib
 import re
+import os
 
 diffView = None
 
@@ -36,7 +37,9 @@ settings = sublime.load_settings('Sublimerge.sublime-settings')
 class SublimergeSettings():
     s = {
         'same_syntax_only': True,
+        'intelligent_files_sort': True,
         'hide_side_bar': True,
+        'compact_files_list': True,
         'diff_region_expander_text': '?',
         'diff_region_scope': 'selection',
         'diff_region_added_scope': 'markup.inserted',
@@ -547,21 +550,82 @@ class SublimergeDiffThread():
 
 class SublimergeCommand(sublime_plugin.WindowCommand):
     viewsList = []
+    viewsPaths = []
     diffIndex = 0
 
     def run(self):
         self.viewsList = []
+        self.viewsPaths = []
         self.diffIndex = 0
         active = self.window.active_view()
 
         if self.saved(active):
             allViews = self.window.views()
+            ratios = []
+            if S.get('intelligent_files_sort'):
+                original = os.path.split(active.file_name())
 
             for view in allViews:
                 if view.file_name() != None and view.file_name() != active.file_name() and (not S.get('same_syntax_only') or view.settings().get('syntax') == active.settings().get('syntax')):
-                    self.viewsList.append(view.file_name())
+                    f = view.file_name()
+
+                    if S.get('intelligent_files_sort'):
+                        sm1 = difflib.SequenceMatcher(None, original[0], os.path.split(f)[0]).ratio()
+                        sm2 = difflib.SequenceMatcher(None, original[1], os.path.split(f)[1]).ratio()
+                        ratios.append({'ratio': sm1 * 0.5 + sm2 * 2, 'file': f, 'dirname': ''})
+                    else:
+                        ratios.append({'ratio': 0, 'file': f, 'dirname': ''})
+
+            ratios.sort(self.sortFiles)
+
+            for f in ratios:
+                self.viewsPaths.append(f['file'])
+                self.viewsList.append(self.prepareListItem(f['file'], f['dirname']))
 
             self.window.show_quick_panel(self.viewsList, self.onListSelect)
+
+    def prepareListItem(self, name, dirname):
+        if S.get('compact_files_list'):
+            sp = os.path.split(name)
+
+            if dirname != '':
+                dirname = ' / ' + dirname
+
+            if (len(sp[0]) > 56):
+                p1 = sp[0][0:20]
+                p2 = sp[0][-36:]
+                return [sp[1] + dirname, p1 + '...' + p2]
+            else:
+                return [sp[1] + dirname, sp[0]]
+        else:
+            return name
+
+    def getFirstDifferentDir(self, a, b):
+        a1 = re.split('[/\\\]', a)
+        a2 = re.split('[/\\\]', b)
+
+        len2 = len(a2) - 1
+
+        for i in range(len(a1)):
+            if i > len2 or a1[i] != a2[i]:
+                return a1[i]
+
+    def sortFiles(self, a, b):
+        d = b['ratio'] - a['ratio']
+
+        sp1 = os.path.split(a['file'])
+        sp2 = os.path.split(b['file'])
+
+        if sp1[1] == sp2[1]:
+            a['dirname'] = self.getFirstDifferentDir(sp1[0], sp2[0])
+            b['dirname'] = self.getFirstDifferentDir(sp2[0], sp1[0])
+
+        if d == 0:
+            return 0
+        if d < 0:
+            return -1
+        if d > 0:
+            return 1
 
     def saved(self, view):
         if view.is_dirty():
@@ -575,7 +639,7 @@ class SublimergeCommand(sublime_plugin.WindowCommand):
             allViews = self.window.views()
             compareTo = None
             for view in allViews:
-                if (view.file_name() == self.viewsList[itemIndex]):
+                if (view.file_name() == self.viewsPaths[itemIndex]):
                     compareTo = view
                     break
 

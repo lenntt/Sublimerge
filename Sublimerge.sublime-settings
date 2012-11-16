@@ -2,8 +2,14 @@
 //overwritten after Sublimerge update. To change the settings, edit
 //the "Settings - User" file (can be found via Preferences menu)
 {
-    //set to true if you want to compare files with the same syntax only
+    //this will limit the list of comparable files to the files with the same syntax
     "same_syntax_only": true,
+
+    //this will order the list of comparable files by file's names similiarity
+    "intelligent_files_sort": true,
+
+    //this will display compact view of comparable files
+    "compact_files_list": true,
 
     //set to true if you want to hide sidebar in comparison window:
     "hide_side_bar": true,
