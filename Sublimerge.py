@@ -576,13 +576,22 @@ class SublimergeCommand(sublime_plugin.WindowCommand):
                     else:
                         ratios.append({'ratio': 0, 'file': f, 'dirname': ''})
 
-            ratios.sort(self.sortFiles)
+            if len(ratios) > 0:
+                ratios.sort(self.sortFiles)
 
-            for f in ratios:
-                self.viewsPaths.append(f['file'])
-                self.viewsList.append(self.prepareListItem(f['file'], f['dirname']))
+                for f in ratios:
+                    self.viewsPaths.append(f['file'])
+                    self.viewsList.append(self.prepareListItem(f['file'], f['dirname']))
 
-            self.window.show_quick_panel(self.viewsList, self.onListSelect)
+                self.window.show_quick_panel(self.viewsList, self.onListSelect)
+            else:
+                if S.get('same_syntax_only'):
+                    syntax = re.match('(.+)\.tmLanguage$', os.path.split(active.settings().get('syntax'))[1])
+                    if syntax != None:
+                        sublime.message_dialog('There are no other open ' + syntax.group(1) + ' files to compare')
+                        return
+
+                sublime.message_dialog('There are no other open files to compare')
 
     def prepareListItem(self, name, dirname):
         if S.get('compact_files_list'):
