@@ -572,7 +572,7 @@ class SublimergeCommand(sublime_plugin.WindowCommand):
                     if S.get('intelligent_files_sort'):
                         sm1 = difflib.SequenceMatcher(None, original[0], os.path.split(f)[0]).ratio()
                         sm2 = difflib.SequenceMatcher(None, original[1], os.path.split(f)[1]).ratio()
-                        ratios.append({'ratio': sm1 * 0.5 + sm2 * 2, 'file': f, 'dirname': ''})
+                        ratios.append({'ratio': sm1 + sm2, 'file': f, 'dirname': ''})
                     else:
                         ratios.append({'ratio': 0, 'file': f, 'dirname': ''})
 
