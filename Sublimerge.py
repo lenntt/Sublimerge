@@ -597,8 +597,10 @@ class SublimergeCommand(sublime_plugin.WindowCommand):
         if S.get('compact_files_list'):
             sp = os.path.split(name)
 
-            if dirname != '':
+            if dirname != None:
                 dirname = ' / ' + dirname
+            else:
+                dirname = ''
 
             if (len(sp[0]) > 56):
                 p1 = sp[0][0:20]
