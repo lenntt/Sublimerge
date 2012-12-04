@@ -548,7 +548,7 @@ class SublimergeDiffThread():
         text1 = self.left.substr(sublime.Region(0, self.left.size()))
 
         if isinstance(self.right, unicode):
-            text2 = open(self.right, 'r').read()
+            text2 = open(self.right, 'rb').read().decode('utf-8', 'replace')
         else:
             text2 = self.right.substr(sublime.Region(0, self.right.size()))
 
