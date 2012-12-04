@@ -49,5 +49,29 @@
 
     //type of gutter icon that is displayed near selected difference region
     //(dot|circle|bookmark|cross):
-    "selected_diff_region_gutter_icon": "bookmark"
+    "selected_diff_region_gutter_icon": "bookmark",
+
+    //Version Control Systems support (EXPERIMENTAL)
+    //If any problems occures, please report immediately via GitHub or e-mail
+    "vcs_support": true,
+
+    //GIT support (applicable when vcs_support = true)
+    //Path to git executable
+    "git_executable_path": "git",
+
+    //Additional arguments for 'git log' command
+    "git_log_args": "",
+
+    //Additional arguments for 'git show' command
+    "git_show_args": "",
+
+    //SVN support (applicable when vcs_support = true)
+    //Path to svn executable
+    "svn_executable_path": "svn",
+
+    //Additional arguments for 'svn log' command
+    "svn_log_args": "",
+
+    //Additional arguments for 'svn cat' command
+    "svn_cat_args": ""
 }

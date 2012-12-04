@@ -28,6 +28,8 @@ import sublime_plugin
 import difflib
 import re
 import os
+import subprocess
+from xml.dom import minidom
 
 diffView = None
 
@@ -48,7 +50,14 @@ class SublimergeSettings():
         'diff_region_change_scope': 'markup.changed',
         'selected_diff_region_scope': 'selection',
         'selected_diff_region_gutter_icon': 'bookmark',
-        'ignore_whitespace': False
+        'ignore_whitespace': False,
+        'vcs_support': True,
+        'git_executable_path': 'git',
+        'git_log_args': '',
+        'git_show_args': '',
+        'svn_executable_path': 'svn',
+        'svn_log_args': '',
+        'svn_cat_args': ''
     }
 
     def load(self):
@@ -207,6 +216,7 @@ class SublimergeView():
     lastRightPos = None
     diff = None
     createdPositions = False
+    tmpFile = ''
 
     def __init__(self, window, left, right, diff):
         window.run_command('new_window')
@@ -223,10 +233,16 @@ class SublimergeView():
         })
 
         self.left = self.window.open_file(left.file_name())
-        self.right = self.window.open_file(right.file_name())
+
+        if isinstance(right, unicode):
+            self.right = self.window.open_file(right)
+            self.right.set_syntax_file(left.settings().get('syntax'))
+            self.tmpFile = right
+        else:
+            self.right = self.window.open_file(right.file_name())
+            self.right.set_syntax_file(right.settings().get('syntax'))
 
         self.left.set_syntax_file(left.settings().get('syntax'))
-        self.right.set_syntax_file(right.settings().get('syntax'))
         self.left.set_scratch(True)
         self.right.set_scratch(True)
 
@@ -413,6 +429,9 @@ class SublimergeView():
         self.selectDiff(self.currentDiff + 1)
 
     def merge(self, direction, mergeAll):
+        if self.tmpFile != '' and direction == '>>':
+            return
+
         if mergeAll:
             while len(self.regions) > 0:
                 self.merge(direction, False)
@@ -527,7 +546,11 @@ class SublimergeDiffThread():
     def run(self):
         global diffView
         text1 = self.left.substr(sublime.Region(0, self.left.size()))
-        text2 = self.right.substr(sublime.Region(0, self.right.size()))
+
+        if isinstance(self.right, unicode):
+            text2 = open(self.right, 'r').read()
+        else:
+            text2 = self.right.substr(sublime.Region(0, self.right.size()))
 
         diff = SublimergeDiffer().difference(text1, text2)
 
@@ -549,14 +572,45 @@ class SublimergeDiffThread():
 
 
 class SublimergeCommand(sublime_plugin.WindowCommand):
-    viewsList = []
     viewsPaths = []
-    diffIndex = 0
+    viewsList = []
+    itemsList = []
+    commits = []
+    window = None
+    view = None
 
-    def run(self):
+    def lookForVcs(self, path):
+        if not S.get('vcs_support'):
+            return False
+
+        if os.path.isdir(path + '/.svn'):
+            return 'svn'
+        elif os.path.isdir(path + '/.git'):
+            return 'git'
+        else:
+            sp = os.path.split(path)
+            if sp[0] != path and sp[0] != '':
+                return self.lookForVcs(sp[0])
+
+    def executeShellCmd(self, exe, cwd):
+        print "Cmd: %s" % (exe)
+        print "Dir: %s" % (cwd)
+
+        p = subprocess.Popen(exe, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=cwd, shell=True)
+
+        while(True):
+            retcode = p.poll()
+            line = re.sub('(^\s+$)|(\s+$)', '', p.stdout.readline())
+
+            if line != '':
+                yield line
+
+            if retcode is not None:
+                break
+
+    def getComparableFiles(self):
         self.viewsList = []
         self.viewsPaths = []
-        self.diffIndex = 0
         active = self.window.active_view()
 
         if self.saved(active):
@@ -601,10 +655,145 @@ class SublimergeCommand(sublime_plugin.WindowCommand):
                 if S.get('same_syntax_only'):
                     syntax = re.match('(.+)\.tmLanguage$', os.path.split(active.settings().get('syntax'))[1])
                     if syntax != None:
-                        sublime.message_dialog('There are no other open ' + syntax.group(1) + ' files to compare')
+                        sublime.error_message('There are no other open ' + syntax.group(1) + ' files to compare')
                         return
 
-                sublime.message_dialog('There are no other open files to compare')
+                sublime.error_message('There are no other open files to compare')
+
+    def run(self):
+        self.window = sublime.active_window()
+        self.active = self.window.active_view()
+
+        sp = os.path.split(self.active.file_name())
+        vcs = self.lookForVcs(sp[0])
+
+        def onMenuSelect(index):
+            if index == 0:
+                self.getComparableFiles()
+            elif index == 1:
+                self.active.set_status('sublimerge-status', 'Fetching commits history...')
+
+                if vcs == 'git':
+                    sublime.set_timeout(self.fetchFromGit, 100)
+                elif vcs == 'svn':
+                    sublime.set_timeout(self.fetchFromSvn, 100)
+
+        items = ['Compare to other file...']
+
+        if vcs:
+            items.append('Compare to revision...')
+
+        if len(items) > 1:
+            self.window.show_quick_panel(items, onMenuSelect)
+        else:
+            self.getComparableFiles()
+
+    def fetchFromSvn(self):
+        sp = os.path.split(self.active.file_name())
+        cmd = '%s log "%s" --xml %s' % (S.get('svn_executable_path'), sp[1], S.get('svn_log_args'))
+        xml = ''
+
+        for line in self.executeShellCmd(cmd, sp[0]):
+            xml += line
+
+        if xml != '':
+            dom = minidom.parseString(xml)
+            commitStack = []
+            for entry in dom.getElementsByTagName('logentry'):
+                author = entry.getElementsByTagName('author')[0].childNodes[0].nodeValue
+                date = entry.getElementsByTagName('date')[0].childNodes[0].nodeValue
+                msgs = entry.getElementsByTagName('msg')
+
+                if len(msgs) > 0 and len(msgs[0].childNodes) > 0:
+                    msg = msgs[0].childNodes[0].nodeValue.splitlines()
+                else:
+                    msg = []
+
+                commitStack.append({'commit': entry.getAttribute('revision'), 'author': author, 'date': date, 'msg': msg})
+
+            self.displayQuickPanel(commitStack, self.onListSelectSvn)
+
+        return
+
+    def onListSelectSvn(self, index):
+        if index >= 0:
+            sp = os.path.split(self.active.file_name())
+
+            outfile = '%s/%s@%s' % (sp[0], sp[1], self.commits[index])
+
+            cmd = '%s cat "%s"@%s %s > %s' % (S.get('svn_executable_path'), sp[1], self.commits[index], S.get('svn_cat_args'), outfile)
+
+            for line in self.executeShellCmd(cmd, sp[0]):
+                print line
+
+            SublimergeDiffThread(self.window, self.active, outfile)
+
+        return
+
+    def fetchFromGit(self):
+        commitStack = []
+        outputStack = []
+
+        def addCommitStack(line):
+            match = re.match('^commit\s+([a-zA-Z0-9]+)$', line)
+
+            if match:
+                commitStack.append({'commit': match.group(1), 'date': '', 'author': '', 'msg': []})
+            elif len(commitStack) > 0:
+                match = re.match('^Author:\s+(.+)$', line)
+                if match:
+                    commitStack[len(commitStack) - 1]['author'] = match.group(1).decode('utf-8', 'replace')
+                else:
+                    match = re.match('^Date:\s+(.+)$', line)
+                    if match:
+                        commitStack[len(commitStack) - 1]['date'] = match.group(1).decode('utf-8', 'replace')
+                    else:
+                        commitStack[len(commitStack) - 1]['msg'].append(line.decode('utf-8', 'replace'))
+            else:
+                outputStack.append(line.decode('utf-8', 'replace'))
+
+        sp = os.path.split(self.active.file_name())
+
+        cmd = '%s log %s -- "%s"' % (S.get('git_executable_path'), S.get('git_log_args'), sp[1])
+
+        for line in self.executeShellCmd(cmd, sp[0]):
+            addCommitStack(line)
+
+        if len(outputStack) > 0:
+            sublime.error_message("\n".join(outputStack))
+            return
+
+        self.displayQuickPanel(commitStack, self.onListSelectGit)
+
+    def onListSelectGit(self, index):
+        sp = os.path.split(self.active.file_name())
+
+        if index >= 0:
+            outfile = '%s/%s@%s' % (sp[0], sp[1], self.commits[index][0:10])
+            cmd = '%s show %s %s:"./%s" > %s' % (S.get('git_executable_path'), S.get('git_show_args'), self.commits[index], sp[1], outfile)
+
+            for line in self.executeShellCmd(cmd, sp[0]):
+                print line
+
+            SublimergeDiffThread(self.window, self.active, outfile)
+
+        return False
+
+    def displayQuickPanel(self, commitStack, callback):
+        self.itemsList = []
+        self.commits = []
+        for item in commitStack:
+            self.commits.append(item['commit'])
+            itm = [item['commit'][0:10] + ' @ ' + item['date'], item['author']]
+            if len(item['msg']) > 0:
+                line = re.sub('(^\s+)|(\s+$)', '', item['msg'][0])
+                itm.append(line)
+
+            self.itemsList.append(itm)
+
+        self.window.show_quick_panel(self.itemsList, callback)
+
+        self.active.erase_status('sublimerge-status')
 
     def prepareListItem(self, name, dirname):
         if S.get('compact_files_list'):
@@ -708,6 +897,9 @@ class SublimergeListener(sublime_plugin.EventListener):
             elif view.id() == diffView.right.id():
                 print "Right file: " + view.file_name()
                 self.right = view
+
+                if diffView.tmpFile != '':
+                    os.remove(diffView.tmpFile)
 
             if self.left != None and self.right != None:
                 diffView.loadDiff()

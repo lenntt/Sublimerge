@@ -3,21 +3,24 @@ Sublimerge
 
 Sublimerge is a Sublime Text 2 plugin which allows to diff and merge files DIRECTLY in the editor using graphical interface for that purpose.
 
+If file is under GIT or SVN it is now possible to compare it with its other revisions. This is experimental feature and can be simply
+turned off via package settings (vcs_support). Please report any problems with this feature.
+
 ![Sublimerge](http://cloud.github.com/downloads/borysf/Sublimerge/Screenshot2.png "Sublimerge")
 
 Default key bindings (platform independent)
 ------------------------------------------
 
-`[ctrl]+[alt]+[d]` - open files menu to select the file you wish diff the current file to  
+`[ctrl]+[alt]+[d]` - open files menu to select the file you wish diff the current file to
 
-`[ctrl]+[alt]+[,]` - merge the change from right to left  
-`[ctrl]+[alt]+[.]` - merge the change from left to right  
+`[ctrl]+[alt]+[,]` - merge the change from right to left
+`[ctrl]+[alt]+[.]` - merge the change from left to right
 
-`[ctrl]+[alt]+[/] + [ctrl]+[alt]+[,]` - merge all changes from right to left  
-`[ctrl]+[alt]+[/] + [ctrl]+[alt]+[.]` - merge all changes from left to right  
+`[ctrl]+[alt]+[/] + [ctrl]+[alt]+[,]` - merge all changes from right to left
+`[ctrl]+[alt]+[/] + [ctrl]+[alt]+[.]` - merge all changes from left to right
 
-`[ctrl]+[alt]+[=]` or `[ctrl]+[alt]+[pagedown]` - go to the next difference  
-`[ctrl]+[alt]+[-]` or `[ctrl]+[alt]+[pageup]` - go to the previous difference  
+`[ctrl]+[alt]+[=]` or `[ctrl]+[alt]+[pagedown]` - go to the next difference
+`[ctrl]+[alt]+[-]` or `[ctrl]+[alt]+[pageup]` - go to the previous difference
 
 
 Installation
